@@ -1,0 +1,260 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Produto {
+  id            String          @id @default(uuid())
+  nome          String
+  marca         String
+  familia       String
+  volumeMl      Int
+  sku           String?         @unique
+  codigoBarras  String?         @unique
+  descricao     String?
+  precoCusto    Decimal
+  precoVenda    Decimal
+  estoque       Int             @default(0)
+  estoqueMin    Int             @default(3)
+  fotoUrl       String?
+  ativo         Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  itensVenda    ItemVenda[]
+  ajustes       EstoqueAjuste[]
+  compras       Compra[]
+
+  @@index([marca])
+  @@index([nome])
+}
+
+model Venda {
+  id             String      @id @default(uuid())
+  subtotal       Decimal
+  descontoTipo   String      @default("VALOR")
+  descontoInput  Decimal     @default(0)
+  descontoValor  Decimal     @default(0)
+  total          Decimal
+  status         String      @default("CONCLUIDA")
+  origem         String      @default("PDV")
+  frete          Decimal     @default(0)
+  caixaId        String?
+  canceladaEm    DateTime?
+  clienteId      String?
+  clienteNome    String?
+  clienteWhatsapp String?
+  clienteEmail   String?
+  tipoEntrega    String?
+  cep            String?
+  endereco       String?
+  numero         String?
+  bairro         String?
+  cidade         String?
+  uf             String?
+  complemento    String?
+  observacao     String?
+  createdAt      DateTime    @default(now())
+  caixa          Caixa?      @relation(fields: [caixaId], references: [id])
+  cliente        Cliente?    @relation(fields: [clienteId], references: [id])
+  itens          ItemVenda[]
+  pagamentos     Pagamento[]
+  contasReceber  ContaReceber[]
+
+  @@index([origem])
+  @@index([status])
+  @@index([clienteId])
+}
+
+model ItemVenda {
+  id            String  @id @default(uuid())
+  vendaId       String
+  produtoId     String
+  quantidade    Int
+  precoUnitario Decimal
+  venda         Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  produto       Produto @relation(fields: [produtoId], references: [id])
+
+  @@index([vendaId])
+  @@index([produtoId])
+}
+
+model Pagamento {
+  id        String  @id @default(uuid())
+  vendaId   String
+  metodo    String
+  valor     Decimal
+  recebido  Decimal?
+  troco     Decimal?
+  parcelas  Int?
+  venda     Venda   @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+
+  @@index([vendaId])
+}
+
+model Caixa {
+  id           String           @id @default(uuid())
+  fundoInicial Decimal
+  status       String           @default("ABERTO")
+  abertoEm     DateTime         @default(now())
+  fechadoEm    DateTime?
+  vendas       Venda[]
+  movimentos   MovimentoCaixa[]
+}
+
+model MovimentoCaixa {
+  id        String   @id @default(uuid())
+  caixaId   String
+  tipo      String
+  valor     Decimal
+  motivo    String?
+  createdAt DateTime @default(now())
+  caixa     Caixa    @relation(fields: [caixaId], references: [id], onDelete: Cascade)
+
+  @@index([caixaId])
+}
+
+model EstoqueAjuste {
+  id         String   @id @default(uuid())
+  produtoId  String
+  tipo       String
+  quantidade Int
+  motivo     String?
+  createdAt  DateTime @default(now())
+  produto    Produto  @relation(fields: [produtoId], references: [id])
+
+  @@index([produtoId])
+}
+
+model Licenca {
+  id             String   @id @default("unica")
+  vencimento     DateTime
+  toleranciaDias Int      @default(5)
+  pixChave       String
+  pixNome        String
+  lojaNome       String   @default("Essential System")
+}
+
+model Fornecedor {
+  id                String   @id @default(uuid())
+  nome              String   @unique
+  cnpj              String?
+  telefone          String?
+  whatsapp          String?
+  email             String?
+  produtosDescricao String?
+  endereco          String?
+  cidade            String?
+  uf                String?
+  cep               String?
+  observacao        String?
+  ativo             Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  compras           Compra[]
+}
+
+model Cliente {
+  id                String   @id @default(uuid())
+  nome              String
+  documento         String?
+  tipo              String   @default("VAREJO")
+  telefone          String?
+  whatsapp          String?
+  email             String?
+  produtosDescricao String?
+  endereco          String?
+  numero            String?
+  bairro            String?
+  cidade            String?
+  uf                String?
+  cep               String?
+  observacao        String?
+  ativo             Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  vendas            Venda[]
+  contasReceber     ContaReceber[]
+
+  @@index([nome])
+  @@index([documento])
+}
+
+model ContaReceber {
+  id          String   @id @default(uuid())
+  clienteId   String
+  vendaId     String?
+  descricao   String?
+  valor       Decimal
+  pago        Decimal  @default(0)
+  vencimento  DateTime?
+  status      String   @default("ABERTA")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  cliente     Cliente  @relation(fields: [clienteId], references: [id])
+  venda       Venda?   @relation(fields: [vendaId], references: [id])
+  recebimentos Recebimento[]
+
+  @@index([clienteId])
+  @@index([status])
+  @@index([vendaId])
+}
+
+model Recebimento {
+  id             String        @id @default(uuid())
+  contaId        String
+  valor          Decimal
+  metodo         String        @default("DINHEIRO")
+  observacao     String?
+  createdAt      DateTime      @default(now())
+  conta          ContaReceber  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@index([contaId])
+}
+
+model Operador {
+  id        String   @id @default(uuid())
+  nome      String
+  usuario   String   @unique
+  senhaHash String
+  role      String   @default("OPERADOR")
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessoes   Sessao[]
+
+  @@index([usuario])
+}
+
+model Sessao {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  operadorId String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  operador   Operador @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([operadorId])
+}
+
+model Compra {
+  id            String      @id @default(uuid())
+  produtoId     String
+  fornecedorId  String?
+  quantidade    Int
+  unidade       String      @default("un")
+  valorUnitario Decimal
+  precoVendaRef Decimal
+  observacao    String?
+  createdAt     DateTime    @default(now())
+  produto       Produto     @relation(fields: [produtoId], references: [id])
+  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
+
+  @@index([produtoId])
+  @@index([fornecedorId])
+  @@index([createdAt])
+}
