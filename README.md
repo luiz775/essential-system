@@ -1,22 +1,43 @@
 # Essential System
 
-Sistema de perfumes com cadastro, fotos, estoque e vendas. Cada venda registra se foi **física** ou **online**.
+PDV completo para loja de perfumes: vendas (física/online), estoque, caixa, compras, clientes, contas a receber e relatórios.
+
+![Painel](docs/screenshots/essential-painel.png)
 
 ## Stack
 
-- React + Vite + Tailwind CSS
-- Node.js + Express
-- Prisma (SQLite no desenvolvimento; PostgreSQL do Supabase em produção)
-- Supabase Storage (bucket público `produtos-fotos`)
+- **Frontend:** React + Vite + TypeScript + Tailwind / MUI
+- **Backend:** Node.js + Express
+- **ORM:** Prisma (SQLite no desenvolvimento; PostgreSQL do Supabase em produção)
+- **Storage:** Supabase Storage (bucket `produtos-fotos`) — opcional; sem ele as fotos vão para `backend/uploads`
 
-## 1. Variáveis de ambiente
+## Telas
 
-Na raiz do projeto, copie `.env.example` para `.env`:
+| Módulo | O que faz |
+|--------|-----------|
+| Painel | KPIs do dia, gráficos e alertas de estoque/caixa |
+| Vendas (PDV) | Busca por SKU/código, carrinho, desconto, atalho F2 |
+| Produtos / Estoque | Cadastro com foto, margem, estoque mínimo |
+| Caixa | Abertura, sangria, suprimento e fechamento |
+| Compras / Fornecedores | Entrada de mercadoria |
+| Clientes / A receber | Cadastro e fiado |
+| Histórico / Relatórios | Reimpressão, cancelamento e mais vendidos |
+| Mensalidade | Licença com PIX e renovação |
 
-```
+![PDV](docs/screenshots/essential-pdv.png)
+
+![Estoque](docs/screenshots/essential-estoque.png)
+
+## Como rodar (local)
+
+### 1. Variáveis de ambiente
+
+Na raiz, copie `.env.example` para `.env`. Para desenvolvimento **sem Supabase**, deixe as chaves vazias:
+
+```env
 DATABASE_URL="file:./dev.db"
-SUPABASE_URL="https://[PROJECT_REF].supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="[service_role]"
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 PORT=3001
 PUBLIC_API_URL="http://localhost:3001"
 CLIENT_ORIGIN="http://localhost:5173"
@@ -24,42 +45,13 @@ CLIENT_ORIGIN="http://localhost:5173"
 
 No frontend, `frontend/.env`:
 
-```
+```env
 VITE_API_URL=http://localhost:3001
 ```
 
-Use a **service_role** só no backend. Nunca coloque essa chave no React.
+Use a **service_role** só no backend. Nunca no React.
 
-## 2. Bucket no Supabase
-
-1. Abra **Storage** no painel do Supabase.
-2. Crie o bucket `produtos-fotos`.
-3. Marque o bucket como **public**.
-4. Se o upload falhar por RLS, rode no SQL Editor:
-
-```sql
-insert into storage.buckets (id, name, public)
-values ('produtos-fotos', 'produtos-fotos', true)
-on conflict (id) do update set public = true;
-
-create policy "Leitura pública das fotos"
-on storage.objects for select
-using (bucket_id = 'produtos-fotos');
-
-create policy "Backend envia fotos"
-on storage.objects for insert
-with check (bucket_id = 'produtos-fotos');
-
-create policy "Backend remove fotos"
-on storage.objects for delete
-using (bucket_id = 'produtos-fotos');
-```
-
-Com `SUPABASE_SERVICE_ROLE_KEY` o backend ignora RLS, mas a leitura pública continua necessária para o PDV exibir as imagens.
-
-Se o Storage ainda não estiver configurado, o backend grava as fotos em `backend/uploads` e serve em `/uploads`. O PDV funciona igual; troque para o bucket quando as chaves do Supabase estiverem no `.env`.
-
-## 3. Banco e seed
+### 2. Instalar, migrar e seed
 
 ```bash
 npm install
@@ -68,32 +60,32 @@ npx prisma generate
 npm run db:seed
 ```
 
-A migration `20260825180000_init` já inclui o campo opcional `Produto.fotoUrl`.
-
-## 4. Subir o sistema
+### 3. Subir
 
 ```bash
 npm run dev
 ```
 
-- Interface: http://localhost:5173
-- API: http://localhost:3001
+- Interface: http://localhost:5173  
+- API: http://localhost:3001  
 
-## Fluxo das fotos
+**Login demo (seed):** usuário `luiz` · senha `1234`  
+Troque essa senha em qualquer ambiente real.
 
-- O formulário mostra preview (drag-and-drop ou clique) antes de salvar.
-- Aceita JPG, PNG e WEBP até 2 MB.
-- No save, o Express (`multer`) envia o arquivo ao bucket, gera nome único (`timestamp-uuid`) e grava a URL pública em `fotoUrl`.
-- Atualizar com nova foto ou remover a atual apaga o arquivo antigo no Storage.
-- Excluir um produto sem histórico de venda também remove a foto. Produto com venda é só desativado.
+## Supabase Storage (opcional)
 
-## Telas
+1. Crie o bucket público `produtos-fotos`
+2. Preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env`
+3. Políticas de exemplo no `.env.example` / histórico do README anterior
 
-- `/` — registrar venda (escolhe se foi **física** ou **online** no checkout).
-- `/estoque` — tabela com avatar da foto ao lado do nome.
-- `/produtos/novo` e `/produtos/:id` — cadastro/edição com upload.
-- `/caixa` — abertura, sangria, suprimento e fechamento.
-- `/historico` — vendas, reimpressão e cancelamento (devolve estoque).
-- `/relatorios` — mais vendidos do mês.
+Sem Storage, o upload local em `/uploads` continua funcionando.
 
-A licença fica na tabela `Licenca` (vencimento + 5 dias de tolerância). Depois disso as vendas são bloqueadas e o PIX de mensalidade aparece no topo.
+## Segurança
+
+- `.env` não é versionado (só `.env.example`)
+- Não commite `service_role`, PIX real ou `LICENCA_MASTER_KEY`
+- O admin seed (`luiz` / `1234`) é só para desenvolvimento
+
+## Autor
+
+**Luiz Gustavo Marques** — [GitHub](https://github.com/luiz775) · [LinkedIn](https://www.linkedin.com/in/luiz-gustavo140694/)
